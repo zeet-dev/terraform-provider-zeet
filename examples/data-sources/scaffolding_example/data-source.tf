@@ -1,3 +1,3 @@
-data "scaffolding_example" "example" {
-  configurable_attribute = "some-value"
+data "zeet_group" "group" {
+  name = "some-value"
 }
