@@ -23,4 +23,5 @@ provider "zeet" {
 
 ### Optional
 
-- `endpoint` (String) Example provider attribute
+- `api_url` (String) The URL of the Zeet API Server.
+- `token` (String) The Zeet API token.
