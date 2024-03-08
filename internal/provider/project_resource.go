@@ -95,6 +95,15 @@ type ProjectContainerWorkflowModel struct {
 	DeployTimeoutSeconds types.Int64           `tfsdk:"deploy_timeout_seconds"`
 }
 
+func (p *ProjectResourceModel) IsContainer() bool {
+	return p.Container != nil
+}
+
+func (p *ProjectResourceModel) IsWorkflow() bool {
+	return p.Workflow != nil && len(p.Deploys) > 0
+
+}
+
 func (r *ProjectResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_project"
 }
@@ -264,7 +273,7 @@ func (r *ProjectResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	if data.Container != nil {
+	if data.IsContainer() {
 		// Create container project
 		result, err := zeetv0.CreateResourceAlphaMutation(ctx, r.client.Client(), zeetv0.CreateResourceAlphaInput{
 			UserID:        data.TeamId.ValueUUID(),
@@ -286,7 +295,7 @@ func (r *ProjectResource) Create(ctx context.Context, req resource.CreateRequest
 		}
 
 		getResult, err := zeetv0.RepoForProjectEnvironmentQuery(ctx, r.client.Client(),
-			fmt.Sprintf("%s/%s", team.User.Name, result.CreateResourceAlpha.Project.Name),
+			fmt.Sprintf("%s/%s", team.User.Login, result.CreateResourceAlpha.Project.Name),
 			result.CreateResourceAlpha.ProjectEnvironment.Name,
 			result.CreateResourceAlpha.Name)
 		if err != nil {
@@ -295,7 +304,7 @@ func (r *ProjectResource) Create(ctx context.Context, req resource.CreateRequest
 		}
 
 		data.Id = customtypes.NewUUIDValue(getResult.Project.Environment.Repo.Id)
-	} else if data.Workflow != nil && len(data.Deploys) > 0 {
+	} else if data.IsWorkflow() {
 		// Create workflow project
 		result, err := zeetv1.CreateProjectMutation(ctx, r.client.ClientV1(), zeetv1.CreateProjectInput{
 			TeamId:     data.TeamId.ValueUUID(),
@@ -334,13 +343,26 @@ func (r *ProjectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	result, err := zeetv1.ProjectDetailQuery(ctx, r.client.ClientV1(), data.TeamId.ValueUUID(), data.Id.ValueUUID())
-	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read project, got error: %s", err))
+	// TODO: implement read logic
+	if data.IsContainer() {
+		// result, err := zeetv1.ProjectDetailQuery(ctx, r.client.ClientV1(), data.TeamId.ValueUUID(), data.Id.ValueUUID())
+		// if err != nil {
+		// 	resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read project, got error: %s", err))
+		// 	return
+		// }
+		// data.Name = types.StringValue(result.Team.Project.Name)
+	} else if data.IsWorkflow() {
+		// result, err := zeetv0.RepoForProjectEnvironmentQuery(ctx, r.client.ClientV1(), data.TeamId.ValueUUID(), data.Id.ValueUUID())
+		// if err != nil {
+		// 	resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read project, got error: %s", err))
+		// 	return
+		// }
+		// data.Name = types.StringValue(result.Team.Project.Name)
+	} else {
+		// Not valid
+		resp.Diagnostics.AddError("Invalid Configuration", "Project must have either a container or workflow configuration")
 		return
 	}
-
-	data.Name = types.StringValue(result.Team.Project.Name)
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -356,15 +378,7 @@ func (r *ProjectResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	result, err := zeetv1.UpdateProjectMutation(ctx, r.client.ClientV1(), data.Id.ValueUUID(), zeetv1.UpdateProjectInput{
-		Name: lo.ToPtr(data.Name.ValueString()),
-	})
-	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update project, got error: %s", err))
-		return
-	}
-
-	data.Name = types.StringValue(result.UpdateProject.Name)
+	// TODO: implement update logic
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -380,9 +394,21 @@ func (r *ProjectResource) Delete(ctx context.Context, req resource.DeleteRequest
 		return
 	}
 
-	_, err := zeetv1.DeleteProjectMutation(ctx, r.client.ClientV1(), data.Id.ValueUUID(), lo.ToPtr(false))
-	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete project, got error: %s", err))
+	if data.IsContainer() {
+		_, err := zeetv0.DeleteProjectMutation(ctx, r.client.Client(), data.Id.ValueUUID())
+		if err != nil {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete project, got error: %s", err))
+			return
+		}
+	} else if data.IsWorkflow() {
+		_, err := zeetv1.DeleteProjectMutation(ctx, r.client.ClientV1(), data.Id.ValueUUID(), lo.ToPtr(false))
+		if err != nil {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete project, got error: %s", err))
+			return
+		}
+	} else {
+		// Not valid
+		resp.Diagnostics.AddError("Invalid Configuration", "Project must have either a container or workflow configuration")
 		return
 	}
 }

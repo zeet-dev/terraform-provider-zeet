@@ -20,7 +20,6 @@ func TestAccProjectResourceHelm(t *testing.T) {
 			t.Fatal(err)
 		}
 		reqs := string(req)
-		fmt.Println("Request", reqs)
 		if strings.Contains(reqs, "mutation createProject") && strings.Contains(reqs, "one") {
 			json.NewEncoder(w).Encode(map[string]any{
 				"data": map[string]any{
@@ -44,13 +43,9 @@ func TestAccProjectResourceHelm(t *testing.T) {
 				json.NewEncoder(w).Encode(map[string]any{
 					"data": map[string]any{
 						"team": map[string]any{
-							"projects": map[string]any{
-								"nodes": []map[string]any{
-									{
-										"id":   "ddf9093e-cc11-46a5-82c7-fc99fc44ef93",
-										"name": "one",
-									},
-								},
+							"project": map[string]any{
+								"id":   "ddf9093e-cc11-46a5-82c7-fc99fc44ef93",
+								"name": "one",
 							},
 						},
 					},
@@ -60,13 +55,9 @@ func TestAccProjectResourceHelm(t *testing.T) {
 				json.NewEncoder(w).Encode(map[string]any{
 					"data": map[string]any{
 						"team": map[string]any{
-							"projects": map[string]any{
-								"nodes": []map[string]any{
-									{
-										"id":   "ddf9093e-cc11-46a5-82c7-fc99fc44ef93",
-										"name": "two",
-									},
-								},
+							"project": map[string]any{
+								"id":   "ddf9093e-cc11-46a5-82c7-fc99fc44ef93",
+								"name": "one",
 							},
 						},
 					},
@@ -91,9 +82,9 @@ func TestAccProjectResourceHelm(t *testing.T) {
 			{
 				Config: testAccProjectResourceConfigWithHelmDeployment(server.URL, "one", "5a0e108d-6df6-456d-aa3a-a89e78b57cf6"),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("zeet_project.test", "name", "one"),
-					resource.TestCheckResourceAttr("zeet_project.test", "team_id", "99c11487-1683-4e10-9620-94d9a78a0b67"),
-					resource.TestCheckResourceAttr("zeet_project.test", "id", "69a5f7df-048d-4fc3-885d-178cdcb9b180"),
+					resource.TestCheckResourceAttr("zeet_project.test_helm", "name", "one"),
+					resource.TestCheckResourceAttr("zeet_project.test_helm", "team_id", "99c11487-1683-4e10-9620-94d9a78a0b67"),
+					resource.TestCheckResourceAttr("zeet_project.test_helm", "id", "69a5f7df-048d-4fc3-885d-178cdcb9b180"),
 				),
 			},
 			// TODO: Update and Read testing
@@ -158,13 +149,17 @@ func TestAccProjectResourceContainer(t *testing.T) {
 			t.Fatal(err)
 		}
 		reqs := string(req)
-		fmt.Println("Request", reqs)
 		if strings.Contains(reqs, "mutation createResourceAlpha") && strings.Contains(reqs, "one") {
 			json.NewEncoder(w).Encode(map[string]any{
 				"data": map[string]any{
-					"createProject": map[string]any{
-						"id":   "69a5f7df-048d-4fc3-885d-178cdcb9b180",
+					"createResourceAlpha": map[string]any{
 						"name": "one",
+						"project": map[string]any{
+							"name": "p",
+						},
+						"projectEnvironment": map[string]any{
+							"name": "e",
+						},
 					},
 				},
 			})
@@ -177,14 +172,25 @@ func TestAccProjectResourceContainer(t *testing.T) {
 					},
 				},
 			})
+		} else if strings.Contains(reqs, "query user") {
+			json.NewEncoder(w).Encode(map[string]any{
+				"data": map[string]any{
+					"user": map[string]any{
+						"id":    "99c11487-1683-4e10-9620-94d9a78a0b67",
+						"login": "test",
+					},
+				},
+			})
 		} else if strings.Contains(reqs, "query repoForProjectEnvironment") {
 			if !created {
 				json.NewEncoder(w).Encode(map[string]any{
 					"data": map[string]any{
 						"project": map[string]any{
+							"name": "p",
 							"environment": map[string]any{
+								"name": "e",
 								"repo": map[string]any{
-									"id":   "ddf9093e-cc11-46a5-82c7-fc99fc44ef93",
+									"id":   "69a5f7df-048d-4fc3-885d-178cdcb9b180",
 									"name": "one",
 								},
 							},
@@ -198,7 +204,7 @@ func TestAccProjectResourceContainer(t *testing.T) {
 						"project": map[string]any{
 							"environment": map[string]any{
 								"repo": map[string]any{
-									"id":   "ddf9093e-cc11-46a5-82c7-fc99fc44ef93",
+									"id":   "69a5f7df-048d-4fc3-885d-178cdcb9b180",
 									"name": "two",
 								},
 							},
@@ -225,9 +231,9 @@ func TestAccProjectResourceContainer(t *testing.T) {
 			{
 				Config: testAccProjectResourceConfigWithContainerDeployment(server.URL, "one", "5a0e108d-6df6-456d-aa3a-a89e78b57cf6"),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("zeet_project.test", "name", "one"),
-					resource.TestCheckResourceAttr("zeet_project.test", "team_id", "99c11487-1683-4e10-9620-94d9a78a0b67"),
-					resource.TestCheckResourceAttr("zeet_project.test", "id", "69a5f7df-048d-4fc3-885d-178cdcb9b180"),
+					resource.TestCheckResourceAttr("zeet_project.test_container", "name", "one"),
+					resource.TestCheckResourceAttr("zeet_project.test_container", "team_id", "99c11487-1683-4e10-9620-94d9a78a0b67"),
+					resource.TestCheckResourceAttr("zeet_project.test_container", "id", "69a5f7df-048d-4fc3-885d-178cdcb9b180"),
 				),
 			},
 			// TODO: Update and Read testing
