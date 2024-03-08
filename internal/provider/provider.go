@@ -85,6 +85,8 @@ func (p *ZeetProvider) Configure(ctx context.Context, req provider.ConfigureRequ
 func (p *ZeetProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		NewGroupResource,
+		NewGroupSubgroupResource,
+		NewProjectResource,
 	}
 }
 

@@ -14,7 +14,8 @@ description: |-
 
 ```terraform
 provider "zeet" {
-  # example configuration here
+  api_url = "https://anchor.zeet.co"
+  token   = "zeet-api-key"
 }
 ```
 
