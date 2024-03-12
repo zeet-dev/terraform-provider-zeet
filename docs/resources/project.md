@@ -27,7 +27,7 @@ Project resource
 
 - `container` (Attributes) Container configuration (see [below for nested schema](#nestedatt--container))
 - `deploys` (Attributes List) Deployment configurations (see [below for nested schema](#nestedatt--deploys))
-- `enabled` (Boolean) Indicates if the project is enabled or not (draft mode)
+- `enabled` (Boolean) Indicates if the project is enabled or not (paused or draft state)
 - `workflow` (Attributes) Workflow configuration (see [below for nested schema](#nestedatt--workflow))
 
 ### Read-Only
@@ -39,14 +39,14 @@ Project resource
 
 Required:
 
-- `kubernetes` (String) Kubernetes configuration for the container
+- `kubernetes` (String) Kubernetes configuration for the container deployment in [JSON format](https://docs.zeet.co/0.1.0/graphql/inputs/resource-kubernetes-input/)
 - `source` (Attributes) Source configuration for the container (see [below for nested schema](#nestedatt--container--source))
 
 Optional:
 
-- `branch` (String) Branch configuration for container deployment
-- `build` (String) Build configuration for the container
-- `workflow` (String) Workflow configuration for container deployment
+- `branch` (String) Branch configuration for container deployment in [JSON format](https://docs.zeet.co/0.1.0/graphql/inputs/resource-branch-input/)
+- `build` (String) Build configuration for the container deployment in [JSON format](https://docs.zeet.co/0.1.0/graphql/inputs/resource-build-input/)
+- `workflow` (String) Workflow configuration for container deployment in [JSON format](https://docs.zeet.co/0.1.0/graphql/inputs/resource-workflow-input/)
 
 Read-Only:
 
@@ -57,8 +57,8 @@ Read-Only:
 
 Optional:
 
-- `container_registry` (String) Container registry configuration for container deployment
-- `git` (String) Git configuration for container deployment
+- `container_registry` (String) Container registry configuration for container deployment in [JSON format](https://docs.zeet.co/0.1.0/graphql/inputs/container-registry-source-input/)
+- `git` (String) Git configuration for container deployment in [JSON format](https://docs.zeet.co/0.1.0/graphql/inputs/git-source-input/)
 
 
 
@@ -67,14 +67,14 @@ Optional:
 
 Required:
 
-- `default_workflow_steps` (List of String) Default workflow steps for deployment
+- `default_workflow_steps` (List of String) Default workflow steps for deployment list of [step types](https://docs.zeet.co/graphql/enums/blueprint-driver-workflow-step-action/)
 
 Optional:
 
-- `helm` (String) Helm deployment configuration
-- `kubernetes` (String) Kubernetes deployment configuration
-- `require_plan_approval` (Boolean) Indicates if deployment plan approval is required
-- `terraform` (String) Terraform deployment configuration
+- `helm` (String) Helm deployment configuration in [JSON format](https://docs.zeet.co/graphql/inputs/deployment-configuration-kubernetes-helm-input/)
+- `kubernetes` (String) Kubernetes deployment configuration in [JSON format](https://docs.zeet.co/graphql/inputs/deployment-configuration-kubernetes-input/)
+- `require_plan_approval` (Boolean) Indicates if approval step is required in the deployment
+- `terraform` (String) Terraform deployment configuration in [JSON format](https://docs.zeet.co/graphql/inputs/deployment-configuration-terraform-input/)
 - `variables` (String) Blueprint variables, GraphQL type [`[BlueprintVariableInput]`](https://docs.zeet.co/graphql/inputs/blueprint-variable-input/)
 
 Read-Only:
@@ -87,7 +87,7 @@ Read-Only:
 
 Required:
 
-- `steps` (String) Workflow steps
+- `steps` (String) Workflow steps in [JSON format](https://docs.zeet.co/graphql/objects/workflow-step-definition/)
 
 Read-Only:
 
