@@ -54,19 +54,22 @@ type ProjectResourceModel struct {
 }
 
 type ProjectDeployModel struct {
-	DefaultWorkflowSteps []types.String       `tfsdk:"default_workflow_steps"`
-	RequirePlanApproval  types.Bool           `tfsdk:"require_plan_approval"`
-	Variables            jsontypes.Normalized `tfsdk:"variables"`
-	Kubernetes           jsontypes.Normalized `tfsdk:"kubernetes"`
-	Helm                 jsontypes.Normalized `tfsdk:"helm"`
-	Terraform            jsontypes.Normalized `tfsdk:"terraform"`
+	Id                   customtypes.UUIDValue `tfsdk:"id"`
+	DefaultWorkflowSteps []types.String        `tfsdk:"default_workflow_steps"`
+	RequirePlanApproval  types.Bool            `tfsdk:"require_plan_approval"`
+	Variables            jsontypes.Normalized  `tfsdk:"variables"`
+	Kubernetes           jsontypes.Normalized  `tfsdk:"kubernetes"`
+	Helm                 jsontypes.Normalized  `tfsdk:"helm"`
+	Terraform            jsontypes.Normalized  `tfsdk:"terraform"`
 }
 
 type ProjectWorkflowModel struct {
-	Steps jsontypes.Normalized `tfsdk:"steps"`
+	Id    customtypes.UUIDValue `tfsdk:"id"`
+	Steps jsontypes.Normalized  `tfsdk:"steps"`
 }
 
 type ProjectContainerModel struct {
+	RepoId     customtypes.UUIDValue          `tfsdk:"repo_id"`
 	Source     ProjectContainerSourceModel    `tfsdk:"source"`
 	Branch     *ProjectContainerBranchModel   `tfsdk:"branch"`
 	Workflow   *ProjectContainerWorkflowModel `tfsdk:"workflow"`
@@ -155,6 +158,11 @@ func (r *ProjectResource) Schema(ctx context.Context, req resource.SchemaRequest
 				Optional:            true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
+						"id": schema.StringAttribute{
+							MarkdownDescription: "Deployment identifier",
+							Computed:            true,
+							CustomType:          customtypes.UUIDType{},
+						},
 						"default_workflow_steps": schema.ListAttribute{
 							MarkdownDescription: "Default workflow steps for deployment",
 							Required:            true,
@@ -190,6 +198,11 @@ func (r *ProjectResource) Schema(ctx context.Context, req resource.SchemaRequest
 				MarkdownDescription: "Workflow configuration",
 				Optional:            true,
 				Attributes: map[string]schema.Attribute{
+					"id": schema.StringAttribute{
+						MarkdownDescription: "Workflow identifier",
+						Computed:            true,
+						CustomType:          customtypes.UUIDType{},
+					},
 					"steps": schema.StringAttribute{
 						MarkdownDescription: "Workflow steps",
 						Required:            true,
@@ -201,6 +214,11 @@ func (r *ProjectResource) Schema(ctx context.Context, req resource.SchemaRequest
 				MarkdownDescription: "Container configuration",
 				Optional:            true,
 				Attributes: map[string]schema.Attribute{
+					"repo_id": schema.StringAttribute{
+						MarkdownDescription: "Repo identifier",
+						Computed:            true,
+						CustomType:          customtypes.UUIDType{},
+					},
 					"source": schema.SingleNestedAttribute{
 						MarkdownDescription: "Source configuration for the container",
 						Required:            true,
@@ -303,10 +321,19 @@ func (r *ProjectResource) Create(ctx context.Context, req resource.CreateRequest
 			return
 		}
 
-		data.Id = customtypes.NewUUIDValue(getResult.Project.Environment.Repo.Id)
+		data.Container.RepoId = customtypes.NewUUIDValue(getResult.Project.Environment.Repo.Id)
+
+		pv3Result, err := zeetv0.ProjectV3Query(ctx, r.client.Client(), data.TeamId.ValueUUID(), result.CreateResourceAlpha.Project.Name, result.CreateResourceAlpha.ProjectEnvironment.Name,
+			result.CreateResourceAlpha.Name)
+		if err != nil {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read project, got error: %s", err))
+			return
+		}
+
+		data.Id = customtypes.NewUUIDValue(pv3Result.User.ProjectV3Adapters.Nodes[0].Id)
 	} else if data.IsWorkflow() {
 		// Create workflow project
-		result, err := zeetv1.CreateProjectMutation(ctx, r.client.ClientV1(), zeetv1.CreateProjectInput{
+		createResult, err := zeetv1.CreateProjectMutation(ctx, r.client.ClientV1(), zeetv1.CreateProjectInput{
 			TeamId:     data.TeamId.ValueUUID(),
 			GroupId:    lo.ToPtr(data.GroupId.ValueUUID()),
 			SubGroupId: lo.ToPtr(data.SubGroupId.ValueUUID()),
@@ -319,7 +346,17 @@ func (r *ProjectResource) Create(ctx context.Context, req resource.CreateRequest
 			return
 		}
 
-		data.Id = customtypes.NewUUIDValue(result.CreateProject.Id)
+		data.Id = customtypes.NewUUIDValue(createResult.CreateProject.Id)
+
+		readResult, err := zeetv1.ProjectDetailQuery(ctx, r.client.ClientV1(), data.TeamId.ValueUUID(), data.Id.ValueUUID())
+		if err != nil {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read project, got error: %s", err))
+			return
+		}
+
+		data.Name = types.StringValue(readResult.Team.Project.Name)
+		data.Workflow.Id = customtypes.NewUUIDValue(readResult.Team.Project.Workflow.Id)
+		data.Deploys[0].Id = customtypes.NewUUIDValue(readResult.Team.Project.Deploys.Nodes[0].Id)
 	} else {
 		// Not valid
 		resp.Diagnostics.AddError("Invalid Configuration", "Project must have either a container or workflow configuration")
@@ -352,12 +389,15 @@ func (r *ProjectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		// }
 		// data.Name = types.StringValue(result.Team.Project.Name)
 	} else if data.IsWorkflow() {
-		// result, err := zeetv0.RepoForProjectEnvironmentQuery(ctx, r.client.ClientV1(), data.TeamId.ValueUUID(), data.Id.ValueUUID())
-		// if err != nil {
-		// 	resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read project, got error: %s", err))
-		// 	return
-		// }
-		// data.Name = types.StringValue(result.Team.Project.Name)
+		readResult, err := zeetv1.ProjectDetailQuery(ctx, r.client.ClientV1(), data.TeamId.ValueUUID(), data.Id.ValueUUID())
+		if err != nil {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read project, got error: %s", err))
+			return
+		}
+
+		data.Name = types.StringValue(readResult.Team.Project.Name)
+		data.Workflow.Id = customtypes.NewUUIDValue(readResult.Team.Project.Workflow.Id)
+		data.Deploys[0].Id = customtypes.NewUUIDValue(readResult.Team.Project.Deploys.Nodes[0].Id)
 	} else {
 		// Not valid
 		resp.Diagnostics.AddError("Invalid Configuration", "Project must have either a container or workflow configuration")
@@ -379,6 +419,28 @@ func (r *ProjectResource) Update(ctx context.Context, req resource.UpdateRequest
 	}
 
 	// TODO: implement update logic
+	if data.IsContainer() {
+		_, err := zeetv0.UpdateProjectSettingsMutation(ctx, r.client.Client(), zeetv0.UpdateProjectInput{
+			Id:   data.Id.ValueUUID(),
+			Name: lo.ToPtr(data.Name.ValueString()),
+		})
+		if err != nil {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update project, got error: %s", err))
+			return
+		}
+	} else if data.IsWorkflow() {
+		_, err := zeetv1.UpdateProjectMutation(ctx, r.client.ClientV1(), data.Id.ValueUUID(), zeetv1.UpdateProjectInput{
+			Name: lo.ToPtr(data.Name.ValueString()),
+		})
+		if err != nil {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update project, got error: %s", err))
+			return
+		}
+	} else {
+		// Not valid
+		resp.Diagnostics.AddError("Invalid Configuration", "Project must have either a container or workflow configuration")
+		return
+	}
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

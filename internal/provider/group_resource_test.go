@@ -1,4 +1,4 @@
-package provider
+package provider_test
 
 import (
 	"encoding/json"
@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+
+	zeetv1 "github.com/zeet-dev/cli/pkg/sdk/v1"
 )
 
 func TestAccGroupResource(t *testing.T) {
@@ -22,32 +24,32 @@ func TestAccGroupResource(t *testing.T) {
 		reqs := string(req)
 		if strings.Contains(reqs, "mutation createGroup") && strings.Contains(reqs, "one") {
 			json.NewEncoder(w).Encode(map[string]any{
-				"data": map[string]any{
-					"createGroup": map[string]any{
-						"id":   "69a5f7df-048d-4fc3-885d-178cdcb9b180",
-						"name": "one",
+				"data": zeetv1.CreateGroupResponse{
+					CreateGroup: zeetv1.CreateGroupCreateGroup{
+						Id:   testGroupId,
+						Name: "one",
 					},
 				},
 			})
 		} else if strings.Contains(reqs, "mutation updateGroup") && strings.Contains(reqs, "two") {
 			json.NewEncoder(w).Encode(map[string]any{
-				"data": map[string]any{
-					"updateGroup": map[string]any{
-						"id":   "69a5f7df-048d-4fc3-885d-178cdcb9b180",
-						"name": "two",
+				"data": zeetv1.UpdateGroupResponse{
+					UpdateGroup: zeetv1.UpdateGroupUpdateGroup{
+						Id:   testGroupId,
+						Name: "two",
 					},
 				},
 			})
 		} else if strings.Contains(reqs, "query group") {
 			if !created {
 				json.NewEncoder(w).Encode(map[string]any{
-					"data": map[string]any{
-						"team": map[string]any{
-							"groups": map[string]any{
-								"nodes": []map[string]any{
+					"data": zeetv1.GroupResponse{
+						Team: &zeetv1.GroupTeam{
+							Groups: zeetv1.GroupTeamGroupsGroupConnection{
+								Nodes: []zeetv1.GroupTeamGroupsGroupConnectionNodesGroup{
 									{
-										"id":   "ddf9093e-cc11-46a5-82c7-fc99fc44ef93",
-										"name": "one",
+										Id:   testGroupId,
+										Name: "one",
 									},
 								},
 							},
@@ -57,13 +59,13 @@ func TestAccGroupResource(t *testing.T) {
 				created = true
 			} else {
 				json.NewEncoder(w).Encode(map[string]any{
-					"data": map[string]any{
-						"team": map[string]any{
-							"groups": map[string]any{
-								"nodes": []map[string]any{
+					"data": zeetv1.GroupResponse{
+						Team: &zeetv1.GroupTeam{
+							Groups: zeetv1.GroupTeamGroupsGroupConnection{
+								Nodes: []zeetv1.GroupTeamGroupsGroupConnectionNodesGroup{
 									{
-										"id":   "ddf9093e-cc11-46a5-82c7-fc99fc44ef93",
-										"name": "two",
+										Id:   testGroupId,
+										Name: "two",
 									},
 								},
 							},
@@ -73,14 +75,15 @@ func TestAccGroupResource(t *testing.T) {
 			}
 		} else if strings.Contains(reqs, "mutation deleteGroup") {
 			json.NewEncoder(w).Encode(map[string]any{
-				"data": map[string]any{
-					"deleteGroup": true,
+				"data": zeetv1.DeleteGroupResponse{
+					DeleteGroup: true,
 				},
 			})
 		} else {
 			t.Fatal("unexpected request")
 		}
 	}))
+
 	defer server.Close()
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -91,8 +94,8 @@ func TestAccGroupResource(t *testing.T) {
 				Config: testAccGroupResourceConfig(server.URL, "one"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("zeet_group.test", "name", "one"),
-					resource.TestCheckResourceAttr("zeet_group.test", "team_id", "99c11487-1683-4e10-9620-94d9a78a0b67"),
-					resource.TestCheckResourceAttr("zeet_group.test", "id", "69a5f7df-048d-4fc3-885d-178cdcb9b180"),
+					resource.TestCheckResourceAttr("zeet_group.test", "team_id", testTeamId.String()),
+					resource.TestCheckResourceAttr("zeet_group.test", "id", testGroupId.String()),
 				),
 			},
 			// Update and Read testing

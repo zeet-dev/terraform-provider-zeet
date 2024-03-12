@@ -1,4 +1,4 @@
-package provider
+package provider_test
 
 import (
 	"encoding/json"
@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+
+	zeetv1 "github.com/zeet-dev/cli/pkg/sdk/v1"
 )
 
 func TestAccGroupSubgroupResource(t *testing.T) {
@@ -22,34 +24,34 @@ func TestAccGroupSubgroupResource(t *testing.T) {
 		reqs := string(req)
 		if strings.Contains(reqs, "mutation createSubGroup") && strings.Contains(reqs, "one") {
 			json.NewEncoder(w).Encode(map[string]any{
-				"data": map[string]any{
-					"createSubGroup": map[string]any{
-						"id":   "149ad8a9-cb35-477b-bbac-39a39f146074",
-						"name": "one",
+				"data": zeetv1.CreateSubGroupResponse{
+					CreateSubGroup: zeetv1.CreateSubGroupCreateSubGroup{
+						Id:   testSubGroupId,
+						Name: "one",
 					},
 				},
 			})
 		} else if strings.Contains(reqs, "mutation updateSubGroup") && strings.Contains(reqs, "two") {
 			json.NewEncoder(w).Encode(map[string]any{
-				"data": map[string]any{
-					"updateSubGroup": map[string]any{
-						"id":   "149ad8a9-cb35-477b-bbac-39a39f146074",
-						"name": "two",
+				"data": zeetv1.UpdateSubGroupResponse{
+					UpdateSubGroup: zeetv1.UpdateSubGroupUpdateSubGroup{
+						Id:   testSubGroupId,
+						Name: "two",
 					},
 				},
 			})
 		} else if strings.Contains(reqs, "query subGroup") {
 			if !created {
 				json.NewEncoder(w).Encode(map[string]any{
-					"data": map[string]any{
-						"team": map[string]any{
-							"groups": map[string]any{
-								"nodes": []map[string]any{
+					"data": zeetv1.SubGroupResponse{
+						Team: &zeetv1.SubGroupTeam{
+							Groups: zeetv1.SubGroupTeamGroupsGroupConnection{
+								Nodes: []zeetv1.SubGroupTeamGroupsGroupConnectionNodesGroup{
 									{
-										"id": "ddf9093e-cc11-46a5-82c7-fc99fc44ef93",
-										"subGroup": map[string]any{
-											"id":   "149ad8a9-cb35-477b-bbac-39a39f146074",
-											"name": "one",
+										Id: testGroupId,
+										SubGroup: zeetv1.SubGroupTeamGroupsGroupConnectionNodesGroupSubGroup{
+											Id:   testSubGroupId,
+											Name: "one",
 										},
 									},
 								},
@@ -60,15 +62,15 @@ func TestAccGroupSubgroupResource(t *testing.T) {
 				created = true
 			} else {
 				json.NewEncoder(w).Encode(map[string]any{
-					"data": map[string]any{
-						"team": map[string]any{
-							"groups": map[string]any{
-								"nodes": []map[string]any{
+					"data": zeetv1.SubGroupResponse{
+						Team: &zeetv1.SubGroupTeam{
+							Groups: zeetv1.SubGroupTeamGroupsGroupConnection{
+								Nodes: []zeetv1.SubGroupTeamGroupsGroupConnectionNodesGroup{
 									{
-										"id": "ddf9093e-cc11-46a5-82c7-fc99fc44ef93",
-										"subGroup": map[string]any{
-											"id":   "149ad8a9-cb35-477b-bbac-39a39f146074",
-											"name": "two",
+										Id: testGroupId,
+										SubGroup: zeetv1.SubGroupTeamGroupsGroupConnectionNodesGroupSubGroup{
+											Id:   testSubGroupId,
+											Name: "two",
 										},
 									},
 								},
@@ -79,14 +81,15 @@ func TestAccGroupSubgroupResource(t *testing.T) {
 			}
 		} else if strings.Contains(reqs, "mutation deleteSubGroup") {
 			json.NewEncoder(w).Encode(map[string]any{
-				"data": map[string]any{
-					"deleteSubGroup": true,
+				"data": zeetv1.DeleteSubGroupResponse{
+					DeleteSubGroup: true,
 				},
 			})
 		} else {
 			t.Fatal("unexpected request")
 		}
 	}))
+
 	defer server.Close()
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -97,9 +100,9 @@ func TestAccGroupSubgroupResource(t *testing.T) {
 				Config: testAccGroupSubgroupResourceConfig(server.URL, "one"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("zeet_group_subgroup.test", "name", "one"),
-					resource.TestCheckResourceAttr("zeet_group_subgroup.test", "group_id", "ddf9093e-cc11-46a5-82c7-fc99fc44ef93"),
-					resource.TestCheckResourceAttr("zeet_group_subgroup.test", "team_id", "99c11487-1683-4e10-9620-94d9a78a0b67"),
-					resource.TestCheckResourceAttr("zeet_group_subgroup.test", "id", "149ad8a9-cb35-477b-bbac-39a39f146074"),
+					resource.TestCheckResourceAttr("zeet_group_subgroup.test", "group_id", testGroupId.String()),
+					resource.TestCheckResourceAttr("zeet_group_subgroup.test", "team_id", testTeamId.String()),
+					resource.TestCheckResourceAttr("zeet_group_subgroup.test", "id", testSubGroupId.String()),
 				),
 			},
 			// Update and Read testing

@@ -1,10 +1,12 @@
-package provider
+package provider_test
 
 import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
+
+	"github.com/zeet-dev/terraform-provider-zeet/internal/provider"
 )
 
 // testAccProtoV6ProviderFactories are used to instantiate a provider during
@@ -12,7 +14,7 @@ import (
 // CLI command executed to create a provider server to which the CLI can
 // reattach.
 var testAccProtoV6ProviderFactories = map[string]func() (tfprotov6.ProviderServer, error){
-	"zeet": providerserver.NewProtocol6WithError(New("test")()),
+	"zeet": providerserver.NewProtocol6WithError(provider.New("test")()),
 }
 
 func testAccPreCheck(t *testing.T) {

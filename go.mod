@@ -11,7 +11,13 @@ require (
 	github.com/hashicorp/terraform-plugin-testing v1.6.0
 	github.com/pkg/errors v0.9.1
 	github.com/samber/lo v1.39.0
-	github.com/zeet-dev/cli v0.9.4
+	github.com/zeet-dev/cli v0.9.5
+)
+
+require (
+	github.com/agnivade/levenshtein v1.1.1 // indirect
+	github.com/alexflint/go-arg v1.4.3 // indirect
+	github.com/alexflint/go-scalar v1.2.0 // indirect
 )
 
 require (

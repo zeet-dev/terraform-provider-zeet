@@ -1,4 +1,4 @@
-package provider
+package provider_test
 
 import (
 	"encoding/json"
@@ -10,10 +10,13 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+
+	zeetv0 "github.com/zeet-dev/cli/pkg/sdk/v0"
+	zeetv1 "github.com/zeet-dev/cli/pkg/sdk/v1"
 )
 
 func TestAccProjectResourceHelm(t *testing.T) {
-	var created bool
+	readCalls := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		req, err := io.ReadAll(r.Body)
 		if err != nil {
@@ -22,42 +25,77 @@ func TestAccProjectResourceHelm(t *testing.T) {
 		reqs := string(req)
 		if strings.Contains(reqs, "mutation createProject") && strings.Contains(reqs, "one") {
 			json.NewEncoder(w).Encode(map[string]any{
-				"data": map[string]any{
-					"createProject": map[string]any{
-						"id":   "69a5f7df-048d-4fc3-885d-178cdcb9b180",
-						"name": "one",
+				"data": zeetv1.CreateProjectResponse{
+					CreateProject: zeetv1.CreateProjectCreateProject{
+						Id:   testProjectId,
+						Name: "one",
+						Workflow: &zeetv1.CreateProjectCreateProjectWorkflow{
+							Id: testWorkflowId,
+						},
 					},
 				},
 			})
 		} else if strings.Contains(reqs, "mutation updateProject") && strings.Contains(reqs, "two") {
 			json.NewEncoder(w).Encode(map[string]any{
-				"data": map[string]any{
-					"updateProject": map[string]any{
-						"id":   "69a5f7df-048d-4fc3-885d-178cdcb9b180",
-						"name": "two",
+				"data": zeetv1.UpdateProjectResponse{
+					UpdateProject: zeetv1.UpdateProjectUpdateProject{
+						Id:   testProjectId,
+						Name: "two",
 					},
 				},
 			})
-		} else if strings.Contains(reqs, "query project") {
-			if !created {
+		} else if strings.Contains(reqs, "query projectDetail") {
+			if readCalls == 0 || readCalls == 1 {
 				json.NewEncoder(w).Encode(map[string]any{
-					"data": map[string]any{
-						"team": map[string]any{
-							"project": map[string]any{
-								"id":   "ddf9093e-cc11-46a5-82c7-fc99fc44ef93",
-								"name": "one",
+					"data": zeetv1.ProjectDetailResponse{
+						Team: &zeetv1.ProjectDetailTeam{
+							Project: &zeetv1.ProjectDetailTeamProject{
+								ProjectDetail: zeetv1.ProjectDetail{
+									ProjectInfo: zeetv1.ProjectInfo{
+										Id:   testProjectId,
+										Name: "one",
+										Workflow: &zeetv1.ProjectInfoWorkflow{
+											Id: testWorkflowId,
+										},
+									},
+									Deploys: zeetv1.ProjectDetailDeploysDeployConnection{
+										Nodes: []zeetv1.ProjectDetailDeploysDeployConnectionNodesDeploy{
+											{
+												DeployConfigurationDetail: zeetv1.DeployConfigurationDetail{
+													Id: testDeployId,
+												},
+											},
+										},
+									},
+								},
 							},
 						},
 					},
 				})
-				created = true
+				readCalls++
 			} else {
 				json.NewEncoder(w).Encode(map[string]any{
-					"data": map[string]any{
-						"team": map[string]any{
-							"project": map[string]any{
-								"id":   "ddf9093e-cc11-46a5-82c7-fc99fc44ef93",
-								"name": "one",
+					"data": zeetv1.ProjectDetailResponse{
+						Team: &zeetv1.ProjectDetailTeam{
+							Project: &zeetv1.ProjectDetailTeamProject{
+								ProjectDetail: zeetv1.ProjectDetail{
+									ProjectInfo: zeetv1.ProjectInfo{
+										Id:   testProjectId,
+										Name: "two",
+										Workflow: &zeetv1.ProjectInfoWorkflow{
+											Id: testWorkflowId,
+										},
+									},
+									Deploys: zeetv1.ProjectDetailDeploysDeployConnection{
+										Nodes: []zeetv1.ProjectDetailDeploysDeployConnectionNodesDeploy{
+											{
+												DeployConfigurationDetail: zeetv1.DeployConfigurationDetail{
+													Id: testDeployId,
+												},
+											},
+										},
+									},
+								},
 							},
 						},
 					},
@@ -65,8 +103,8 @@ func TestAccProjectResourceHelm(t *testing.T) {
 			}
 		} else if strings.Contains(reqs, "mutation deleteProject") {
 			json.NewEncoder(w).Encode(map[string]any{
-				"data": map[string]any{
-					"deleteProject": true,
+				"data": zeetv1.DeleteProjectResponse{
+					DeleteProject: true,
 				},
 			})
 		} else {
@@ -80,20 +118,20 @@ func TestAccProjectResourceHelm(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: testAccProjectResourceConfigWithHelmDeployment(server.URL, "one", "5a0e108d-6df6-456d-aa3a-a89e78b57cf6"),
+				Config: testAccProjectResourceConfigWithHelmDeployment(server.URL, "one", testClusterId.String()),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("zeet_project.test_helm", "name", "one"),
-					resource.TestCheckResourceAttr("zeet_project.test_helm", "team_id", "99c11487-1683-4e10-9620-94d9a78a0b67"),
-					resource.TestCheckResourceAttr("zeet_project.test_helm", "id", "69a5f7df-048d-4fc3-885d-178cdcb9b180"),
+					resource.TestCheckResourceAttr("zeet_project.test_helm", "team_id", testTeamId.String()),
+					resource.TestCheckResourceAttr("zeet_project.test_helm", "id", testProjectId.String()),
 				),
 			},
-			// TODO: Update and Read testing
-			// {
-			// 	Config: testAccProjectResourceConfigWithHelmDeployment(server.URL, "two", "5a0e108d-6df6-456d-aa3a-a89e78b57cf6"),
-			// 	Check: resource.ComposeAggregateTestCheckFunc(
-			// 		resource.TestCheckResourceAttr("zeet_project.test", "name", "two"),
-			// 	),
-			// },
+			// Update and Read testing
+			{
+				Config: testAccProjectResourceConfigWithHelmDeployment(server.URL, "two", testClusterId.String()),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("zeet_project.test_helm", "name", "two"),
+				),
+			},
 			// Delete testing automatically occurs in TestCase
 		},
 	})
@@ -151,47 +189,77 @@ func TestAccProjectResourceContainer(t *testing.T) {
 		reqs := string(req)
 		if strings.Contains(reqs, "mutation createResourceAlpha") && strings.Contains(reqs, "one") {
 			json.NewEncoder(w).Encode(map[string]any{
-				"data": map[string]any{
-					"createResourceAlpha": map[string]any{
-						"name": "one",
-						"project": map[string]any{
-							"name": "p",
+				"data": zeetv0.CreateResourceAlphaResponse{
+					CreateResourceAlpha: zeetv0.CreateResourceAlphaCreateResourceAlphaRepo{
+						Name: "one",
+						Project: &zeetv0.CreateResourceAlphaCreateResourceAlphaRepoProject{
+							Name: "p",
 						},
-						"projectEnvironment": map[string]any{
-							"name": "e",
+						ProjectEnvironment: &zeetv0.CreateResourceAlphaCreateResourceAlphaRepoProjectEnvironment{
+							Name: "e",
 						},
 					},
 				},
 			})
-		} else if strings.Contains(reqs, "mutation updateProject") && strings.Contains(reqs, "two") {
+		} else if strings.Contains(reqs, "mutation updateProjectSettings") && strings.Contains(reqs, "two") {
 			json.NewEncoder(w).Encode(map[string]any{
-				"data": map[string]any{
-					"updateProject": map[string]any{
-						"id":   "69a5f7df-048d-4fc3-885d-178cdcb9b180",
-						"name": "two",
+				"data": zeetv0.UpdateProjectSettingsResponse{
+					UpdateProject: zeetv0.UpdateProjectSettingsUpdateProjectRepo{
+						Id: testRepoId,
+						RepoDetail: zeetv0.RepoDetail{
+							RepoCommon: zeetv0.RepoCommon{
+								Name: "two",
+							},
+						},
 					},
 				},
 			})
 		} else if strings.Contains(reqs, "query user") {
 			json.NewEncoder(w).Encode(map[string]any{
-				"data": map[string]any{
-					"user": map[string]any{
-						"id":    "99c11487-1683-4e10-9620-94d9a78a0b67",
-						"login": "test",
+				"data": zeetv0.UserResponse{
+					User: zeetv0.UserUser{
+						Id: testTeamId,
+						UserDetail: zeetv0.UserDetail{
+							UserCommon: zeetv0.UserCommon{
+								UserPublicCommon: zeetv0.UserPublicCommon{
+									Login: "test",
+								},
+							},
+						},
+					},
+				},
+			})
+		} else if strings.Contains(reqs, "query projectV3") {
+			json.NewEncoder(w).Encode(map[string]any{
+				"data": zeetv0.ProjectV3Response{
+					User: zeetv0.ProjectV3User{
+						ProjectV3Adapters: &zeetv0.ProjectV3UserProjectV3AdaptersProjectV3AdapterConnection{
+							Nodes: []zeetv0.ProjectV3UserProjectV3AdaptersProjectV3AdapterConnectionNodesProjectV3Adapter{
+								{
+									ProjectV3AdapterDetail: zeetv0.ProjectV3AdapterDetail{
+										Id: testProjectId,
+									},
+								},
+							},
+						},
 					},
 				},
 			})
 		} else if strings.Contains(reqs, "query repoForProjectEnvironment") {
 			if !created {
 				json.NewEncoder(w).Encode(map[string]any{
-					"data": map[string]any{
-						"project": map[string]any{
-							"name": "p",
-							"environment": map[string]any{
-								"name": "e",
-								"repo": map[string]any{
-									"id":   "69a5f7df-048d-4fc3-885d-178cdcb9b180",
-									"name": "one",
+					"data": zeetv0.RepoForProjectEnvironmentResponse{
+						Project: &zeetv0.RepoForProjectEnvironmentProject{
+							Id: testGroupId,
+							Environment: zeetv0.RepoForProjectEnvironmentProjectEnvironment{
+								Id: testSubGroupId,
+								Repo: &zeetv0.RepoForProjectEnvironmentProjectEnvironmentRepo{
+									RepoDetail: zeetv0.RepoDetail{
+										RepoCommon: zeetv0.RepoCommon{
+											Id:   testRepoId,
+											Name: "one",
+										},
+									},
 								},
 							},
 						},
@@ -200,12 +268,18 @@ func TestAccProjectResourceContainer(t *testing.T) {
 				created = true
 			} else {
 				json.NewEncoder(w).Encode(map[string]any{
-					"data": map[string]any{
-						"project": map[string]any{
-							"environment": map[string]any{
-								"repo": map[string]any{
-									"id":   "69a5f7df-048d-4fc3-885d-178cdcb9b180",
-									"name": "two",
+					"data": zeetv0.RepoForProjectEnvironmentResponse{
+						Project: &zeetv0.RepoForProjectEnvironmentProject{
+							Id: testGroupId,
+							Environment: zeetv0.RepoForProjectEnvironmentProjectEnvironment{
+								Id: testSubGroupId,
+								Repo: &zeetv0.RepoForProjectEnvironmentProjectEnvironmentRepo{
+									RepoDetail: zeetv0.RepoDetail{
+										RepoCommon: zeetv0.RepoCommon{
+											Id:   testRepoId,
+											Name: "two",
+										},
+									},
 								},
 							},
 						},
@@ -214,8 +288,8 @@ func TestAccProjectResourceContainer(t *testing.T) {
 			}
 		} else if strings.Contains(reqs, "mutation deleteProject") {
 			json.NewEncoder(w).Encode(map[string]any{
-				"data": map[string]any{
-					"deleteProject": true,
+				"data": zeetv0.DeleteProjectResponse{
+					DeleteRepo: true,
 				},
 			})
 		} else {
@@ -229,11 +303,11 @@ func TestAccProjectResourceContainer(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: testAccProjectResourceConfigWithContainerDeployment(server.URL, "one", "5a0e108d-6df6-456d-aa3a-a89e78b57cf6"),
+				Config: testAccProjectResourceConfigWithContainerDeployment(server.URL, "one", testClusterId.String()),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("zeet_project.test_container", "name", "one"),
-					resource.TestCheckResourceAttr("zeet_project.test_container", "team_id", "99c11487-1683-4e10-9620-94d9a78a0b67"),
-					resource.TestCheckResourceAttr("zeet_project.test_container", "id", "69a5f7df-048d-4fc3-885d-178cdcb9b180"),
+					resource.TestCheckResourceAttr("zeet_project.test_container", "team_id", testTeamId.String()),
+					resource.TestCheckResourceAttr("zeet_project.test_container", "container.repo_id", testRepoId.String()),
 				),
 			},
 			// TODO: Update and Read testing
