@@ -148,7 +148,7 @@ func (r *ProjectResource) Schema(ctx context.Context, req resource.SchemaRequest
 				CustomType:          customtypes.UUIDType{},
 			},
 			"enabled": schema.BoolAttribute{
-				MarkdownDescription: "Indicates if the project is enabled or not (draft mode)",
+				MarkdownDescription: "Indicates if the project is enabled or not (paused or draft state)",
 				Optional:            true,
 				Computed:            true,
 				Default:             booldefault.StaticBool(true),
@@ -164,12 +164,12 @@ func (r *ProjectResource) Schema(ctx context.Context, req resource.SchemaRequest
 							CustomType:          customtypes.UUIDType{},
 						},
 						"default_workflow_steps": schema.ListAttribute{
-							MarkdownDescription: "Default workflow steps for deployment",
+							MarkdownDescription: "Default workflow steps for deployment list of [step types](https://docs.zeet.co/graphql/enums/blueprint-driver-workflow-step-action/)",
 							Required:            true,
 							ElementType:         types.StringType,
 						},
 						"require_plan_approval": schema.BoolAttribute{
-							MarkdownDescription: "Indicates if deployment plan approval is required",
+							MarkdownDescription: "Indicates if approval step is required in the deployment",
 							Optional:            true,
 						},
 						"variables": schema.StringAttribute{
@@ -178,17 +178,17 @@ func (r *ProjectResource) Schema(ctx context.Context, req resource.SchemaRequest
 							CustomType:          jsontypes.NormalizedType{},
 						},
 						"kubernetes": schema.StringAttribute{
-							MarkdownDescription: "Kubernetes deployment configuration",
+							MarkdownDescription: "Kubernetes deployment configuration in [JSON format](https://docs.zeet.co/graphql/inputs/deployment-configuration-kubernetes-input/)",
 							Optional:            true,
 							CustomType:          jsontypes.NormalizedType{},
 						},
 						"helm": schema.StringAttribute{
-							MarkdownDescription: "Helm deployment configuration",
+							MarkdownDescription: "Helm deployment configuration in [JSON format](https://docs.zeet.co/graphql/inputs/deployment-configuration-kubernetes-helm-input/)",
 							Optional:            true,
 							CustomType:          jsontypes.NormalizedType{},
 						},
 						"terraform": schema.StringAttribute{
-							MarkdownDescription: "Terraform deployment configuration",
+							MarkdownDescription: "Terraform deployment configuration in [JSON format](https://docs.zeet.co/graphql/inputs/deployment-configuration-terraform-input/)",
 							Optional:            true,
 							CustomType:          jsontypes.NormalizedType{},
 						},
@@ -204,7 +204,7 @@ func (r *ProjectResource) Schema(ctx context.Context, req resource.SchemaRequest
 						CustomType:          customtypes.UUIDType{},
 					},
 					"steps": schema.StringAttribute{
-						MarkdownDescription: "Workflow steps",
+						MarkdownDescription: "Workflow steps in [JSON format](https://docs.zeet.co/graphql/objects/workflow-step-definition/)",
 						Required:            true,
 						CustomType:          jsontypes.NormalizedType{},
 					},
@@ -224,34 +224,34 @@ func (r *ProjectResource) Schema(ctx context.Context, req resource.SchemaRequest
 						Required:            true,
 						Attributes: map[string]schema.Attribute{
 							"git": schema.StringAttribute{
-								MarkdownDescription: "Git configuration for container deployment",
+								MarkdownDescription: "Git configuration for container deployment in [JSON format](https://docs.zeet.co/0.1.0/graphql/inputs/git-source-input/)",
 								Optional:            true,
 								CustomType:          jsontypes.NormalizedType{},
 							},
 							"container_registry": schema.StringAttribute{
-								MarkdownDescription: "Container registry configuration for container deployment",
+								MarkdownDescription: "Container registry configuration for container deployment in [JSON format](https://docs.zeet.co/0.1.0/graphql/inputs/container-registry-source-input/)",
 								Optional:            true,
 								CustomType:          jsontypes.NormalizedType{},
 							},
 						},
 					},
 					"branch": schema.StringAttribute{
-						MarkdownDescription: "Branch configuration for container deployment",
+						MarkdownDescription: "Branch configuration for container deployment in [JSON format](https://docs.zeet.co/0.1.0/graphql/inputs/resource-branch-input/)",
 						Optional:            true,
 						CustomType:          jsontypes.NormalizedType{},
 					},
 					"workflow": schema.StringAttribute{
-						MarkdownDescription: "Workflow configuration for container deployment",
+						MarkdownDescription: "Workflow configuration for container deployment in [JSON format](https://docs.zeet.co/0.1.0/graphql/inputs/resource-workflow-input/)",
 						Optional:            true,
 						CustomType:          jsontypes.NormalizedType{},
 					},
 					"build": schema.StringAttribute{
-						MarkdownDescription: "Build configuration for the container",
+						MarkdownDescription: "Build configuration for the container deployment in [JSON format](https://docs.zeet.co/0.1.0/graphql/inputs/resource-build-input/)",
 						Optional:            true,
 						CustomType:          jsontypes.NormalizedType{},
 					},
 					"kubernetes": schema.StringAttribute{
-						MarkdownDescription: "Kubernetes configuration for the container",
+						MarkdownDescription: "Kubernetes configuration for the container deployment in [JSON format](https://docs.zeet.co/0.1.0/graphql/inputs/resource-kubernetes-input/)",
 						Required:            true,
 						CustomType:          jsontypes.NormalizedType{},
 					},

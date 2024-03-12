@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	"github.com/zeet-dev/cli/pkg/api"
+	zeetv0 "github.com/zeet-dev/cli/pkg/sdk/v0"
 	zeetv1 "github.com/zeet-dev/cli/pkg/sdk/v1"
 	"github.com/zeet-dev/terraform-provider-zeet/internal/provider/customtypes"
 )
@@ -29,8 +30,8 @@ type BlueprintDataSource struct {
 
 // BlueprintDataSourceModel describes the data source data model.
 type BlueprintDataSourceModel struct {
-	TeamId        customtypes.UUIDValue        `tfsdk:"team_id"`
 	Id            customtypes.UUIDValue        `tfsdk:"id"`
+	Slug          types.String                 `tfsdk:"slug"`
 	IsOfficial    types.Bool                   `tfsdk:"is_official"`
 	Type          types.String                 `tfsdk:"type"`
 	Configuration *BlueprintConfigurationModel `tfsdk:"configuration"`
@@ -57,15 +58,14 @@ func (d *BlueprintDataSource) Schema(ctx context.Context, req datasource.SchemaR
 		// This description is used by the documentation generator and the language server.
 		MarkdownDescription: "Blueprint data source",
 		Attributes: map[string]schema.Attribute{
-			"team_id": schema.StringAttribute{
-				MarkdownDescription: "Team identifier",
-				Required:            true,
+			"id": schema.StringAttribute{
+				MarkdownDescription: "Blueprint identifier, either id or slug must be set, can be used for official and custom blueprints",
+				Optional:            true,
 				CustomType:          customtypes.UUIDType{},
 			},
-			"id": schema.StringAttribute{
-				MarkdownDescription: "Blueprint identifier",
-				Required:            true,
-				CustomType:          customtypes.UUIDType{},
+			"slug": schema.StringAttribute{
+				MarkdownDescription: "Blueprint slug, either id or slug must be set, can only be used for official blueprints",
+				Optional:            true,
 			},
 			"is_official": schema.BoolAttribute{
 				MarkdownDescription: "Blueprint is official",
@@ -105,17 +105,17 @@ func (d *BlueprintDataSource) Schema(ctx context.Context, req datasource.SchemaR
 						Computed:            true,
 					},
 					"driver_configuration": schema.StringAttribute{
-						MarkdownDescription: "Blueprint driver configuration in JSON format",
+						MarkdownDescription: "Blueprint driver configuration in [JSON format](https://docs.zeet.co/graphql/objects/blueprint-configuration/#code-style-fontweight-normal-blueprintconfigurationbdriverconfigurationbcodeblueprintdriverconfiguration-)",
 						Computed:            true,
 						CustomType:          jsontypes.NormalizedType{},
 					},
 					"rich_input_schema": schema.StringAttribute{
-						MarkdownDescription: "Blueprint rich input schema in JSON format",
+						MarkdownDescription: "Blueprint rich input schema in [JSON format](https://anchor.zeet.co/static/schemas/blueprint-rich-input-schema.schema.json)",
 						Computed:            true,
 						CustomType:          jsontypes.NormalizedType{},
 					},
 					"variables": schema.StringAttribute{
-						MarkdownDescription: "Blueprint variables in JSON format",
+						MarkdownDescription: "Blueprint variables in (JSON format)[https://docs.zeet.co/graphql/objects/blueprint-configuration/#code-style-fontweight-normal-blueprintconfigurationbvariablesbcodeblueprintvariablespec--]",
 						Computed:            true,
 						CustomType:          jsontypes.NormalizedType{},
 					},
@@ -155,40 +155,55 @@ func (d *BlueprintDataSource) Read(ctx context.Context, req datasource.ReadReque
 		return
 	}
 
-	result, err := zeetv1.BlueprintQuery(ctx, d.client.ClientV1(), data.TeamId.ValueUUID(), data.Id.ValueUUID())
+	if data.Id.IsNull() {
+		if data.Slug.IsNull() {
+			resp.Diagnostics.AddError("Invalid Configuration", "Either id or slug must be set")
+			return
+		}
+		// query official blueprint by slug
+		result, err := zeetv0.MarketplaceBlueprintQuery(ctx, d.client.Client(), "zeet", data.Slug.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read blueprint, got error: %s", err))
+			return
+		}
+		data.Id = customtypes.NewUUIDValue(result.BlueprintsMarketplace.Blueprint.Id)
+	}
+
+	result, err := zeetv1.BlueprintByIdQuery(ctx, d.client.ClientV1(), data.Id.ValueUUID())
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read blueprint, got error: %s", err))
 		return
 	}
 
-	data.Id = customtypes.NewUUIDValue(result.Team.Blueprint.Id)
-	data.IsOfficial = types.BoolValue(*result.Team.Blueprint.IsOfficial)
-	data.Type = types.StringValue(string(result.Team.Blueprint.Type))
+	data.Id = customtypes.NewUUIDValue(result.Blueprint.Id)
+	data.Slug = types.StringValue(result.Blueprint.Configuration.Slug)
+	data.IsOfficial = types.BoolValue(*result.Blueprint.IsOfficial)
+	data.Type = types.StringValue(string(result.Blueprint.Type))
 	data.Configuration = &BlueprintConfigurationModel{
-		Slug:        types.StringValue(result.Team.Blueprint.Configuration.Slug),
-		DisplayName: types.StringValue(result.Team.Blueprint.Configuration.DisplayName),
-		Published:   types.BoolValue(result.Team.Blueprint.Configuration.Published),
-		// DriverConfiguration: jsontypes.NewNormalizedValue(result.Team.Blueprint.Configuration),
-		// Variables: jsontypes.NewNormalizedValue(result.Team.Blueprint.Configuration.Variables),
+		Slug:        types.StringValue(result.Blueprint.Configuration.Slug),
+		DisplayName: types.StringValue(result.Blueprint.Configuration.DisplayName),
+		Published:   types.BoolValue(result.Blueprint.Configuration.Published),
+		// DriverConfiguration: jsontypes.NewNormalizedValue(result.Blueprint.Configuration),
+		// Variables: jsontypes.NewNormalizedValue(result.Blueprint.Configuration.Variables),
 	}
 
-	if result.Team.Blueprint.Configuration.Description != nil {
-		data.Configuration.Description = types.StringValue(*result.Team.Blueprint.Configuration.Description)
+	if result.Blueprint.Configuration.Description != nil {
+		data.Configuration.Description = types.StringValue(*result.Blueprint.Configuration.Description)
 	}
 
-	if result.Team.Blueprint.Enabled != nil {
-		data.Configuration.Enabled = types.BoolValue(*result.Team.Blueprint.Enabled)
+	if result.Blueprint.Enabled != nil {
+		data.Configuration.Enabled = types.BoolValue(*result.Blueprint.Enabled)
 	}
 
-	tags, diag := types.ListValueFrom(ctx, types.StringType, result.Team.Blueprint.Configuration.Tags)
+	tags, diag := types.ListValueFrom(ctx, types.StringType, result.Blueprint.Configuration.Tags)
 	if diag.HasError() {
 		resp.Diagnostics.Append(diag...)
 		return
 	}
 	data.Configuration.Tags = tags
 
-	if result.Team.Blueprint.Configuration.RichInputSchema != nil {
-		data.Configuration.RichInputSchema = jsontypes.NewNormalizedValue(*result.Team.Blueprint.Configuration.RichInputSchema)
+	if result.Blueprint.Configuration.RichInputSchema != nil {
+		data.Configuration.RichInputSchema = jsontypes.NewNormalizedValue(*result.Blueprint.Configuration.RichInputSchema)
 	}
 
 	// Write logs using the tflog package
