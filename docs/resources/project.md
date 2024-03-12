@@ -48,6 +48,10 @@ Optional:
 - `build` (String) Build configuration for the container
 - `workflow` (String) Workflow configuration for container deployment
 
+Read-Only:
+
+- `repo_id` (String) Repo identifier
+
 <a id="nestedatt--container--source"></a>
 ### Nested Schema for `container.source`
 
@@ -73,6 +77,10 @@ Optional:
 - `terraform` (String) Terraform deployment configuration
 - `variables` (String) Blueprint variables, GraphQL type [`[BlueprintVariableInput]`](https://docs.zeet.co/graphql/inputs/blueprint-variable-input/)
 
+Read-Only:
+
+- `id` (String) Deployment identifier
+
 
 <a id="nestedatt--workflow"></a>
 ### Nested Schema for `workflow`
@@ -80,3 +88,7 @@ Optional:
 Required:
 
 - `steps` (String) Workflow steps
+
+Read-Only:
+
+- `id` (String) Workflow identifier
