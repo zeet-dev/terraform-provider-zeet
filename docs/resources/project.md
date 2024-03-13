@@ -40,13 +40,15 @@ Project resource
 Required:
 
 - `kubernetes` (String) Kubernetes configuration for the container deployment in [JSON format](https://docs.zeet.co/0.1.0/graphql/inputs/resource-kubernetes-input/)
+Update is not supported at the moment
 - `source` (Attributes) Source configuration for the container (see [below for nested schema](#nestedatt--container--source))
 
 Optional:
 
-- `branch` (String) Branch configuration for container deployment in [JSON format](https://docs.zeet.co/0.1.0/graphql/inputs/resource-branch-input/)
+- `branch` (Attributes) Branch configuration for container deployment (see [below for nested schema](#nestedatt--container--branch))
 - `build` (String) Build configuration for the container deployment in [JSON format](https://docs.zeet.co/0.1.0/graphql/inputs/resource-build-input/)
-- `workflow` (String) Workflow configuration for container deployment in [JSON format](https://docs.zeet.co/0.1.0/graphql/inputs/resource-workflow-input/)
+Update is not supported at the moment
+- `workflow` (Attributes) Workflow configuration for container deployment (see [below for nested schema](#nestedatt--container--workflow))
 
 Read-Only:
 
@@ -61,6 +63,34 @@ Optional:
 - `git` (String) Git configuration for container deployment in [JSON format](https://docs.zeet.co/0.1.0/graphql/inputs/git-source-input/)
 
 
+<a id="nestedatt--container--branch"></a>
+### Nested Schema for `container.branch`
+
+Optional:
+
+- `auto_deploy_branch` (Boolean) Indicates if auto deploy branch is enabled
+Update is not supported at the moment
+- `auto_stop_branch` (Boolean) Indicates if auto stop branch is enabled
+Update is not supported at the moment
+- `branch_ignore` (String) Branch ignore for container deployment
+Update is not supported at the moment
+- `branch_stop_ignore` (String) Branch stop ignore for container deployment
+Update is not supported at the moment
+- `production_branch` (String) Production branch for container deployment
+
+
+<a id="nestedatt--container--workflow"></a>
+### Nested Schema for `container.workflow`
+
+Optional:
+
+- `auto_retry` (Boolean) Indicates if auto retry is enabled
+- `auto_rollback` (Boolean) Indicates if auto rollback is enabled
+- `deploy_timeout_seconds` (Number) Deploy timeout in seconds
+- `manual_deploy` (Boolean) Indicates if manual deploy is enabled
+- `pipeline_cluster_id` (String) Pipeline cluster identifier
+
+
 
 <a id="nestedatt--deploys"></a>
 ### Nested Schema for `deploys`
@@ -73,7 +103,7 @@ Optional:
 
 - `helm` (String) Helm deployment configuration in [JSON format](https://docs.zeet.co/graphql/inputs/deployment-configuration-kubernetes-helm-input/)
 - `kubernetes` (String) Kubernetes deployment configuration in [JSON format](https://docs.zeet.co/graphql/inputs/deployment-configuration-kubernetes-input/)
-- `require_plan_approval` (Boolean) Indicates if approval step is required in the deployment
+- `require_plan_approval` (Boolean) Indicates if the approval step is required in all workflow runs
 - `terraform` (String) Terraform deployment configuration in [JSON format](https://docs.zeet.co/graphql/inputs/deployment-configuration-terraform-input/)
 - `variables` (String) Blueprint variables, GraphQL type [`[BlueprintVariableInput]`](https://docs.zeet.co/graphql/inputs/blueprint-variable-input/)
 
