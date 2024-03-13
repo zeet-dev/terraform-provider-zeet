@@ -10,11 +10,17 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/samber/lo"
 
 	zeetv0 "github.com/zeet-dev/cli/pkg/sdk/v0"
 	zeetv1 "github.com/zeet-dev/cli/pkg/sdk/v1"
 )
 
+/*
+create (1st apply) = Create + Read
+update (2nd apply) = Read + Update
+destroy = Delete
+*/
 func TestAccProjectResourceHelm(t *testing.T) {
 	readCalls := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -45,24 +51,28 @@ func TestAccProjectResourceHelm(t *testing.T) {
 				},
 			})
 		} else if strings.Contains(reqs, "query projectDetail") {
-			if readCalls == 0 || readCalls == 1 {
-				json.NewEncoder(w).Encode(map[string]any{
-					"data": zeetv1.ProjectDetailResponse{
-						Team: &zeetv1.ProjectDetailTeam{
-							Project: &zeetv1.ProjectDetailTeamProject{
-								ProjectDetail: zeetv1.ProjectDetail{
-									ProjectInfo: zeetv1.ProjectInfo{
-										Id:   testProjectId,
-										Name: "one",
-										Workflow: &zeetv1.ProjectInfoWorkflow{
-											Id: testWorkflowId,
-										},
-									},
-									Deploys: zeetv1.ProjectDetailDeploysDeployConnection{
-										Nodes: []zeetv1.ProjectDetailDeploysDeployConnectionNodesDeploy{
-											{
-												DeployConfigurationDetail: zeetv1.DeployConfigurationDetail{
-													Id: testDeployId,
+			data := zeetv1.ProjectDetailResponse{
+				Team: &zeetv1.ProjectDetailTeam{
+					Project: &zeetv1.ProjectDetailTeamProject{
+						ProjectDetail: zeetv1.ProjectDetail{
+							ProjectInfo: zeetv1.ProjectInfo{
+								Id:     testProjectId,
+								Name:   "one",
+								Status: zeetv1.ProjectStatusJobRunStarting,
+								Workflow: &zeetv1.ProjectInfoWorkflow{
+									Id: testWorkflowId,
+								},
+							},
+							Deploys: zeetv1.ProjectDetailDeploysDeployConnection{
+								Nodes: []zeetv1.ProjectDetailDeploysDeployConnectionNodesDeploy{
+									{
+										DeployConfigurationDetail: zeetv1.DeployConfigurationDetail{
+											Id: testDeployId,
+											Configuration: &zeetv1.DeployConfigurationDetailConfigurationDeploymentConfiguration{
+												DefaultWorkflowSteps: []zeetv1.BlueprintDriverWorkflowStepAction{
+													zeetv1.BlueprintDriverWorkflowStepActionDriverPlan,
+													zeetv1.BlueprintDriverWorkflowStepActionDriverApprove,
+													zeetv1.BlueprintDriverWorkflowStepActionDriverApply,
 												},
 											},
 										},
@@ -71,34 +81,17 @@ func TestAccProjectResourceHelm(t *testing.T) {
 							},
 						},
 					},
+				},
+			}
+			if readCalls == 0 || readCalls == 1 {
+				json.NewEncoder(w).Encode(map[string]any{
+					"data": data,
 				})
 				readCalls++
 			} else {
+				data.Team.Project.ProjectDetail.ProjectInfo.Name = "two"
 				json.NewEncoder(w).Encode(map[string]any{
-					"data": zeetv1.ProjectDetailResponse{
-						Team: &zeetv1.ProjectDetailTeam{
-							Project: &zeetv1.ProjectDetailTeamProject{
-								ProjectDetail: zeetv1.ProjectDetail{
-									ProjectInfo: zeetv1.ProjectInfo{
-										Id:   testProjectId,
-										Name: "two",
-										Workflow: &zeetv1.ProjectInfoWorkflow{
-											Id: testWorkflowId,
-										},
-									},
-									Deploys: zeetv1.ProjectDetailDeploysDeployConnection{
-										Nodes: []zeetv1.ProjectDetailDeploysDeployConnectionNodesDeploy{
-											{
-												DeployConfigurationDetail: zeetv1.DeployConfigurationDetail{
-													Id: testDeployId,
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
+					"data": data,
 				})
 			}
 		} else if strings.Contains(reqs, "mutation deleteProject") {
@@ -154,15 +147,15 @@ resource "zeet_project" "test_helm" {
   deploys = [{
 	default_workflow_steps = ["DRIVER_PLAN", "DRIVER_APPROVE", "DRIVER_APPLY"]
 	helm = jsonencode({
-	  blueprint: {
-		source: {
-		  helmRepository: {
+	  blueprint = {
+		source = {
+		  helmRepository = {
 			repositoryUrl: "https://grafana.github.io/helm-charts",
 			chart: "grafana"
 		  }
 		}
 	  },
-	  target: {
+	  target = {
 		clusterId: %[3]q,
 		namespace: "grafana",
 		releaseName: "grafana"
@@ -188,6 +181,7 @@ func TestAccProjectResourceContainer(t *testing.T) {
 		}
 		reqs := string(req)
 		if strings.Contains(reqs, "mutation createResourceAlpha") && strings.Contains(reqs, "one") {
+			// create step 1
 			json.NewEncoder(w).Encode(map[string]any{
 				"data": zeetv0.CreateResourceAlphaResponse{
 					CreateResourceAlpha: zeetv0.CreateResourceAlphaCreateResourceAlphaRepo{
@@ -201,7 +195,28 @@ func TestAccProjectResourceContainer(t *testing.T) {
 					},
 				},
 			})
+		} else if strings.Contains(reqs, "query projectV3") {
+			// create step 2
+			json.NewEncoder(w).Encode(map[string]any{
+				"data": zeetv0.ProjectV3Response{
+					User: zeetv0.ProjectV3User{
+						ProjectV3Adapters: &zeetv0.ProjectV3UserProjectV3AdaptersProjectV3AdapterConnection{
+							Nodes: []zeetv0.ProjectV3UserProjectV3AdaptersProjectV3AdapterConnectionNodesProjectV3Adapter{
+								{
+									ProjectV3AdapterDetail: zeetv0.ProjectV3AdapterDetail{
+										Id: testProjectId,
+										Repo: &zeetv0.ProjectV3AdapterDetailRepo{
+											Id: testRepoId.String(),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			})
 		} else if strings.Contains(reqs, "mutation updateProjectSettings") && strings.Contains(reqs, "two") {
+			// update step 2
 			json.NewEncoder(w).Encode(map[string]any{
 				"data": zeetv0.UpdateProjectSettingsResponse{
 					UpdateProject: zeetv0.UpdateProjectSettingsUpdateProjectRepo{
@@ -214,76 +229,68 @@ func TestAccProjectResourceContainer(t *testing.T) {
 					},
 				},
 			})
-		} else if strings.Contains(reqs, "query user") {
-			json.NewEncoder(w).Encode(map[string]any{
-				"data": zeetv0.UserResponse{
-					User: zeetv0.UserUser{
-						Id: testTeamId.String(),
-						UserDetail: zeetv0.UserDetail{
-							UserCommon: zeetv0.UserCommon{
-								UserPublicCommon: zeetv0.UserPublicCommon{
-									Login: "test",
+		} else if strings.Contains(reqs, "query userRepo") {
+			data := zeetv0.UserRepoResponse{
+				CurrentUser: zeetv0.UserRepoCurrentUser{
+					Repo: &zeetv0.UserRepoCurrentUserRepo{
+						Id: testRepoId.String(),
+						RepoDetail: zeetv0.RepoDetail{
+							DeployService: lo.ToPtr(true),
+							RepoCommon: zeetv0.RepoCommon{
+								Id:   testRepoId.String(),
+								Name: "one",
+								Source: zeetv0.RepoCommonSourceRepoSource{
+									Id:   "https://github.com/zeet-demo/node-express-demo.git",
+									Type: zeetv0.RepoSourceTypeGit,
 								},
 							},
-						},
-					},
-				},
-			})
-		} else if strings.Contains(reqs, "query projectV3") {
-			json.NewEncoder(w).Encode(map[string]any{
-				"data": zeetv0.ProjectV3Response{
-					User: zeetv0.ProjectV3User{
-						ProjectV3Adapters: &zeetv0.ProjectV3UserProjectV3AdaptersProjectV3AdapterConnection{
-							Nodes: []zeetv0.ProjectV3UserProjectV3AdaptersProjectV3AdapterConnectionNodesProjectV3Adapter{
-								{
-									ProjectV3AdapterDetail: zeetv0.ProjectV3AdapterDetail{
-										Id: testProjectId,
-									},
+							RepoBuild: zeetv0.RepoBuild{
+								BuildMethod: &zeetv0.RepoBuildBuildMethod{
+									Type:             zeetv0.BuildTypeNode,
+									BuildCommand:     lo.ToPtr("npm --production=false install"),
+									RunCommand:       lo.ToPtr("npm start"),
+									WorkingDirectory: lo.ToPtr("./"),
+									NodejsVersion:    lo.ToPtr("18"),
 								},
 							},
-						},
-					},
-				},
-			})
-		} else if strings.Contains(reqs, "query repoForProjectEnvironment") {
-			if !created {
-				json.NewEncoder(w).Encode(map[string]any{
-					"data": zeetv0.RepoForProjectEnvironmentResponse{
-						Project: &zeetv0.RepoForProjectEnvironmentProject{
-							Id: testGroupId,
-							Environment: zeetv0.RepoForProjectEnvironmentProjectEnvironment{
+							DeployTarget: lo.ToPtr(zeetv0.DeployTargetKubernetes),
+							Cluster: &zeetv0.RepoDetailCluster{
+								Id: testClusterId,
+							},
+							Project: &zeetv0.RepoDetailProject{
+								Id: testGroupId,
+							},
+							ProjectEnvironment: &zeetv0.RepoDetailProjectEnvironment{
 								Id: testSubGroupId,
-								Repo: &zeetv0.RepoForProjectEnvironmentProjectEnvironmentRepo{
-									RepoDetail: zeetv0.RepoDetail{
-										RepoCommon: zeetv0.RepoCommon{
-											Id:   testRepoId.String(),
-											Name: "one",
-										},
+							},
+							RepoNetwork: zeetv0.RepoNetwork{
+								Ports: []zeetv0.RepoNetworkPortsPort{
+									{
+										Port:     "3000",
+										Protocol: string(zeetv0.PortProtocolTcp),
+										Public:   true,
+										Https:    true,
 									},
 								},
 							},
+							Cpu:       lo.ToPtr("1"),
+							Memory:    lo.ToPtr("1G"),
+							Dedicated: lo.ToPtr(false),
 						},
 					},
+				},
+			}
+			if !created {
+				// create step 2
+				json.NewEncoder(w).Encode(map[string]any{
+					"data": data,
 				})
 				created = true
 			} else {
+				// update step 1
+				data.CurrentUser.Repo.RepoDetail.RepoCommon.Name = "two"
 				json.NewEncoder(w).Encode(map[string]any{
-					"data": zeetv0.RepoForProjectEnvironmentResponse{
-						Project: &zeetv0.RepoForProjectEnvironmentProject{
-							Id: testGroupId,
-							Environment: zeetv0.RepoForProjectEnvironmentProjectEnvironment{
-								Id: testSubGroupId,
-								Repo: &zeetv0.RepoForProjectEnvironmentProjectEnvironmentRepo{
-									RepoDetail: zeetv0.RepoDetail{
-										RepoCommon: zeetv0.RepoCommon{
-											Id:   testRepoId.String(),
-											Name: "two",
-										},
-									},
-								},
-							},
-						},
-					},
+					"data": data,
 				})
 			}
 		} else if strings.Contains(reqs, "mutation deleteProject") {
@@ -293,7 +300,7 @@ func TestAccProjectResourceContainer(t *testing.T) {
 				},
 			})
 		} else {
-			t.Fatal("unexpected request")
+			t.Fatal("unexpected request", reqs[:42])
 		}
 	}))
 	defer server.Close()
@@ -343,7 +350,7 @@ resource "zeet_project" "test_container" {
       })
     }
     build = jsonencode({
-      build: {
+      build = {
         buildType: "NODE",
         buildCommand: "npm --production=false install",
         nodejsVersion: "18",
@@ -352,14 +359,12 @@ resource "zeet_project" "test_container" {
       }
     })
     kubernetes = jsonencode({
-      deployTarget: {
+      deployTarget = {
         deployTarget: "KUBERNETES",
         clusterID: %[3]q
       },
-      app: {
+      app = {
         deployService: true,
-        volumes: [],
-        envs: [],
         ports: [
           {
             port: "3000",
@@ -368,10 +373,10 @@ resource "zeet_project" "test_container" {
             https: true
           }
         ],
-        resources: {
+        resources = {
           cpu: 1,
           memory: 1,
-          spot: false
+          spot: true
         }
       }
     })

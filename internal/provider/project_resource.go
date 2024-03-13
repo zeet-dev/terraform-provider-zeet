@@ -644,21 +644,24 @@ func (r *ProjectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		}
 
 		// workflow
-		data.Container.Workflow = &ProjectContainerWorkflowModel{}
+		workflow := ProjectContainerWorkflowModel{}
 		if getResult.CurrentUser.Repo.AutoRetry != nil {
-			data.Container.Workflow.AutoRetry = types.BoolValue(*getResult.CurrentUser.Repo.AutoRetry)
+			workflow.AutoRetry = types.BoolValue(*getResult.CurrentUser.Repo.AutoRetry)
 		}
 		if getResult.CurrentUser.Repo.AutoRollback != nil {
-			data.Container.Workflow.AutoRollback = types.BoolValue(*getResult.CurrentUser.Repo.AutoRollback)
+			workflow.AutoRollback = types.BoolValue(*getResult.CurrentUser.Repo.AutoRollback)
 		}
 		if getResult.CurrentUser.Repo.ManualDeploy != nil {
-			data.Container.Workflow.ManualDeploy = types.BoolValue(*getResult.CurrentUser.Repo.ManualDeploy)
+			workflow.ManualDeploy = types.BoolValue(*getResult.CurrentUser.Repo.ManualDeploy)
 		}
 		if getResult.CurrentUser.Repo.PipelineCluster != nil && getResult.CurrentUser.Repo.PipelineCluster.Id != uuid.Nil {
-			data.Container.Workflow.PipelineClusterId = customtypes.NewUUIDValue(getResult.CurrentUser.Repo.PipelineCluster.Id)
+			workflow.PipelineClusterId = customtypes.NewUUIDValue(getResult.CurrentUser.Repo.PipelineCluster.Id)
 		}
 		if getResult.CurrentUser.Repo.DeployTimeoutSeconds != nil {
-			data.Container.Workflow.DeployTimeoutSeconds = types.Int64Value(int64(*getResult.CurrentUser.Repo.DeployTimeoutSeconds))
+			workflow.DeployTimeoutSeconds = types.Int64Value(int64(*getResult.CurrentUser.Repo.DeployTimeoutSeconds))
+		}
+		if !lo.IsEmpty(workflow) {
+			data.Container.Workflow = &workflow
 		}
 
 		// source & build
@@ -690,7 +693,11 @@ func (r *ProjectResource) Read(ctx context.Context, req resource.ReadRequest, re
 
 			// build
 			buildInput := zeetv0.ResourceBuildInput{
-				Build: &zeetv0.ProjectBuildInput{
+				GitSubmodules: getResult.CurrentUser.Repo.GitSubmodules,
+				// TODO: add other misc build fields
+			}
+			if getResult.CurrentUser.Repo.BuildMethod != nil {
+				buildInput.Build = &zeetv0.ProjectBuildInput{
 					BuildType:        &getResult.CurrentUser.Repo.BuildMethod.Type,
 					DockerfilePath:   getResult.CurrentUser.Repo.BuildMethod.DockerfilePath,
 					WorkingDirectory: getResult.CurrentUser.Repo.BuildMethod.WorkingDirectory,
@@ -700,9 +707,7 @@ func (r *ProjectResource) Read(ctx context.Context, req resource.ReadRequest, re
 					NodejsVersion:    getResult.CurrentUser.Repo.BuildMethod.NodejsVersion,
 					PythonVersion:    getResult.CurrentUser.Repo.BuildMethod.PythonVersion,
 					GolangVersion:    getResult.CurrentUser.Repo.BuildMethod.GolangVersion,
-				},
-				GitSubmodules: getResult.CurrentUser.Repo.GitSubmodules,
-				// TODO: add other misc build fields
+				}
 			}
 			valJson, err = json.Marshal(buildInput)
 			if err != nil {
@@ -751,10 +756,12 @@ func (r *ProjectResource) Read(ctx context.Context, req resource.ReadRequest, re
 				*getResult.CurrentUser.Repo.Cpu != "" && *getResult.CurrentUser.Repo.Memory != "" {
 				input.App.Resources = &zeetv0.ContainerResourcesSpecInput{
 					Cpu:              lo.Must(strconv.ParseFloat(*getResult.CurrentUser.Repo.Cpu, 64)),
-					Memory:           lo.Must(strconv.ParseFloat(*getResult.CurrentUser.Repo.Memory, 64)),
+					Memory:           lo.Must(strconv.ParseFloat(strings.TrimSuffix(*getResult.CurrentUser.Repo.Memory, "G"), 64)),
 					EphemeralStorage: getResult.CurrentUser.Repo.EphemeralStorage,
-					Spot:             lo.ToPtr(*getResult.CurrentUser.Repo.Dedicated),
 					// Accelerator: &zeetv0.ContainerResourcesAcceleratorSpecInput{},
+				}
+				if getResult.CurrentUser.Repo.Dedicated != nil {
+					input.App.Resources.Spot = lo.ToPtr(!*getResult.CurrentUser.Repo.Dedicated)
 				}
 			}
 			valJson, err := json.Marshal(input)
@@ -775,7 +782,7 @@ func (r *ProjectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		}
 
 		data.Name = types.StringValue(readResult.Team.Project.Name)
-		data.Enabled = types.BoolValue(readResult.Team.Project.Status == zeetv1.ProjectStatusPaused)
+		data.Enabled = types.BoolValue(readResult.Team.Project.Status != zeetv1.ProjectStatusPaused)
 
 		// workflow
 		data.Workflow.Id = customtypes.NewUUIDValue(readResult.Team.Project.Workflow.Id)
@@ -783,6 +790,10 @@ func (r *ProjectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		// deploys
 		for i, deploy := range readResult.Team.Project.Deploys.Nodes {
 			data.Deploys[i].Id = customtypes.NewUUIDValue(deploy.Id)
+			if deploy.Configuration == nil {
+				resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read project, got error: %s", "deploy configuration is missing"))
+				return
+			}
 			data.Deploys[i].DefaultWorkflowSteps = lo.Map(deploy.Configuration.DefaultWorkflowSteps, func(s zeetv1.BlueprintDriverWorkflowStepAction, _ int) types.String {
 				return types.StringValue(string(s))
 			})

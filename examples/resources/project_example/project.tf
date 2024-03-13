@@ -1,94 +1,81 @@
-data "zeet_team" "team" {
-  id = "some-uuid"
+terraform {
+  required_providers {
+    zeet = {
+      source  = "zeet-dev/zeet"
+      version = "0.0.5"
+    }
+  }
 }
 
-data "zeet_group" "group" {
-  team_id = data.zeet_team.team.id
-  id      = "some-uuid"
+variable "team_id" {
+  type = string
 }
 
-resource "zeet_project" "container_project" {
-  team_id     = data.zeet_team.team.id
-  group_id    = data.zeet_group.group.id
-  subgroup_id = "some-uuid"
+variable "cluster_id" {
+  type = string
+}
 
-  name         = "project-name"
-  blueprint_id = "some-uuid"
+resource "zeet_group" "group" {
+  team_id = var.team_id
+  name    = "my-group"
+}
+
+resource "zeet_group_subgroup" "subgroup" {
+  team_id  = var.team_id
+  group_id = zeet_group.group.id
+  name     = "my-subgroup"
+}
+
+data "zeet_blueprint" "service_container" {
+  slug = "zeet-kubernetes-container-app"
+}
+
+resource "zeet_project" "container" {
+  team_id     = var.team_id
+  group_id    = zeet_group.group.id
+  subgroup_id = zeet_group_subgroup.subgroup.id
+
+  name         = "my-container"
+  blueprint_id = data.zeet_blueprint.service_container.id
+  enabled      = false // draft mode
 
   container = {
     source = {
-      git = jsonencode({
-        repository = "https://github.com/zeet-demo/node-express-demo.git"
+      container_registry = jsonencode({
+        repository = "docker.io/library/nginx",
+        tag        = "latest"
       })
     }
-    build = jsonencode({
-      build = {
-        buildType        = "NODE",
-        buildCommand     = "npm --production=false install",
-        nodejsVersion    = "18",
-        runCommand       = "npm start",
-        workingDirectory = "./"
-      }
-    })
+    workflow = {
+      deploy_timeout_seconds = 300
+    }
     kubernetes = jsonencode({
       deployTarget = {
-        deployTarget = "KUBERNETES",
-        clusterID    = "some-uuid",
-      },
+        deployTarget = "KUBERNETES"
+        clusterID    = var.cluster_id
+      }
+      namespace = var.team_id
       app = {
-        deployService = true,
-        volumes       = [],
-        envs          = [],
+        deployService = true
         ports = [
           {
-            port     = "3000",
-            protocol = "tcp",
-            public   = true,
+            port     = "80"
+            protocol = "tcp"
+            public   = true
             https    = true
           }
-        ],
-        resources = {
-          cpu    = 1,
-          memory = 1,
-          spot   = false
-        }
+        ]
       }
     })
   }
-
-  enabled = true
 }
 
-resource "zeet_project" "helm_project" {
-  team_id     = data.zeet_team.team.id
-  group_id    = data.zeet_group.group.id
-  subgroup_id = "some-uuid"
+output "project_id" {
+  description = "value of the project_id used in apiv1"
+  value = zeet_project.container.id
+}
 
-  name         = "project-name"
-  blueprint_id = "some-uuid"
-
-  deploys = [{
-    default_workflow_steps = ["DRIVER_PLAN", "DRIVER_APPROVE", "DRIVER_APPLY"]
-    helm = jsonencode({
-      blueprint = {
-        source = {
-          helmRepository = {
-            repositoryUrl = "https://grafana.github.io/helm-charts",
-            chart         = "grafana"
-          }
-        }
-      },
-      target = {
-        clusterId   = "some-uuid",
-        namespace   = "grafana",
-        releaseName = "grafana"
-      }
-    })
-  }]
-
-  workflow = {
-    steps = jsonencode([{ action = "ORCHESTRATION_DEPLOY" }])
-  }
-
-  enabled = true
+output "repo_id" {
+  description = "value of the repo_id used in apiv0"
+  value = zeet_project.container.container.repo_id
 }
