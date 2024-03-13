@@ -205,7 +205,7 @@ func TestAccProjectResourceContainer(t *testing.T) {
 			json.NewEncoder(w).Encode(map[string]any{
 				"data": zeetv0.UpdateProjectSettingsResponse{
 					UpdateProject: zeetv0.UpdateProjectSettingsUpdateProjectRepo{
-						Id: testRepoId,
+						Id: testRepoId.String(),
 						RepoDetail: zeetv0.RepoDetail{
 							RepoCommon: zeetv0.RepoCommon{
 								Name: "two",
@@ -218,7 +218,7 @@ func TestAccProjectResourceContainer(t *testing.T) {
 			json.NewEncoder(w).Encode(map[string]any{
 				"data": zeetv0.UserResponse{
 					User: zeetv0.UserUser{
-						Id: testTeamId,
+						Id: testTeamId.String(),
 						UserDetail: zeetv0.UserDetail{
 							UserCommon: zeetv0.UserCommon{
 								UserPublicCommon: zeetv0.UserPublicCommon{
@@ -256,7 +256,7 @@ func TestAccProjectResourceContainer(t *testing.T) {
 								Repo: &zeetv0.RepoForProjectEnvironmentProjectEnvironmentRepo{
 									RepoDetail: zeetv0.RepoDetail{
 										RepoCommon: zeetv0.RepoCommon{
-											Id:   testRepoId,
+											Id:   testRepoId.String(),
 											Name: "one",
 										},
 									},
@@ -276,7 +276,7 @@ func TestAccProjectResourceContainer(t *testing.T) {
 								Repo: &zeetv0.RepoForProjectEnvironmentProjectEnvironmentRepo{
 									RepoDetail: zeetv0.RepoDetail{
 										RepoCommon: zeetv0.RepoCommon{
-											Id:   testRepoId,
+											Id:   testRepoId.String(),
 											Name: "two",
 										},
 									},

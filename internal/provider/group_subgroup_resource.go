@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -53,11 +54,17 @@ func (r *GroupSubgroupResource) Schema(ctx context.Context, req resource.SchemaR
 				MarkdownDescription: "Team identifier",
 				Required:            true,
 				CustomType:          customtypes.UUIDType{},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"group_id": schema.StringAttribute{
 				MarkdownDescription: "Group identifier",
 				Required:            true,
 				CustomType:          customtypes.UUIDType{},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"id": schema.StringAttribute{
 				Computed:            true,
@@ -139,7 +146,9 @@ func (r *GroupSubgroupResource) Read(ctx context.Context, req resource.ReadReque
 		return
 	}
 
-	data.Name = types.StringValue(result.Team.Groups.Nodes[0].SubGroup.Name)
+	if len(result.Team.Groups.Nodes) == 1 {
+		data.Name = types.StringValue(result.Team.Groups.Nodes[0].SubGroup.Name)
+	}
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -181,8 +190,12 @@ func (r *GroupSubgroupResource) Delete(ctx context.Context, req resource.DeleteR
 
 	_, err := zeetv1.DeleteSubGroupMutation(ctx, r.client.ClientV1(), data.Id.ValueUUID())
 	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete subgroup, got error: %s", err))
-		return
+		if strings.Contains(err.Error(), "record not found") {
+			resp.Diagnostics.AddWarning("Client Error", "Subgroup not found, assuming it has been deleted")
+		} else {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete subgroup, got error: %s", err))
+			return
+		}
 	}
 }
 

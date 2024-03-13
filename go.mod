@@ -11,16 +11,10 @@ require (
 	github.com/hashicorp/terraform-plugin-testing v1.6.0
 	github.com/pkg/errors v0.9.1
 	github.com/samber/lo v1.39.0
-	github.com/zeet-dev/cli v0.9.6
+	github.com/zeet-dev/cli v0.10.0
 )
 
-require (
-	github.com/agnivade/levenshtein v1.1.1 // indirect
-	github.com/alexflint/go-arg v1.4.3 // indirect
-	github.com/alexflint/go-scalar v1.2.0 // indirect
-	golang.org/x/tools v0.19.0 // indirect
-	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
-)
+require gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 
 require (
 	github.com/Khan/genqlient v0.7.0 // indirect

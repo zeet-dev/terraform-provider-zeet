@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -52,6 +53,9 @@ func (r *GroupResource) Schema(ctx context.Context, req resource.SchemaRequest, 
 				MarkdownDescription: "Team identifier",
 				Required:            true,
 				CustomType:          customtypes.UUIDType{},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"id": schema.StringAttribute{
 				Computed:            true,
@@ -133,7 +137,9 @@ func (r *GroupResource) Read(ctx context.Context, req resource.ReadRequest, resp
 		return
 	}
 
-	data.Name = types.StringValue(result.Team.Groups.Nodes[0].Name)
+	if len(result.Team.Groups.Nodes) == 1 {
+		data.Name = types.StringValue(result.Team.Groups.Nodes[0].Name)
+	}
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -175,8 +181,12 @@ func (r *GroupResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 
 	_, err := zeetv1.DeleteGroupMutation(ctx, r.client.ClientV1(), data.Id.ValueUUID())
 	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete group, got error: %s", err))
-		return
+		if strings.Contains(err.Error(), "record not found") {
+			resp.Diagnostics.AddWarning("Client Error", "Group not found, assuming it has been deleted")
+		} else {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete group, got error: %s", err))
+			return
+		}
 	}
 }
 
