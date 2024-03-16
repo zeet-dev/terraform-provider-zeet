@@ -120,7 +120,16 @@ func (r *ProjectResource) Metadata(ctx context.Context, req resource.MetadataReq
 
 func (r *ProjectResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Project resource",
+		MarkdownDescription: "The `zeet_project` resource manages Zeet projects, categorized into two types based on deployment strategies: " +
+			"Container-based and Workflow-based projects.\n\n" +
+			"**Container-based Projects**: The `container` attribute defines deployment specifications for Docker containers, " +
+			"including the source repository, build settings, Kubernetes deployment configuration, and container-specific workflows. " +
+			"This setup suits service or job containers deployable directly to Kubernetes clusters.\n\n" +
+			"**Workflow-based Projects**: The `workflow` and `deploys` attributes are for projects deploying via Helm charts, " +
+			"Kubernetes manifests, or using Terraform for infrastructure as code. `workflow` outlines the deployment's sequence " +
+			"of operations, such as build and deploy steps, while `deploys` specifies the deployment configuration, including driver execution steps.\n\n" +
+			"Projects must use one of these configurations without combining them within the same project. It's possible to define " +
+			"multiple projects with different configurations to create more complex architectures.",
 		Attributes: map[string]schema.Attribute{
 			"team_id": schema.StringAttribute{
 				MarkdownDescription: "Team identifier",

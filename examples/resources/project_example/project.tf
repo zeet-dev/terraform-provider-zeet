@@ -2,7 +2,7 @@ terraform {
   required_providers {
     zeet = {
       source  = "zeet-dev/zeet"
-      version = "1.0.0"
+      version = "~> 1.0.0"
     }
   }
 }
